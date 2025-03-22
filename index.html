@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>「肉」の線の身体</title>
+    <style>
+        body { 
+            margin: 0; overflow: hidden; background: white; 
+        }
+        canvas { 
+            display: block; 
+            position: absolute;
+        }
+        .controls {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(255, 255, 255, 0.8);
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            margin-bottom: 10px;
+        }
+        #text {
+            position: relative;
+        }
+        #centence {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            text-align: center;
+            width: 100%;
+            /*background-color: #011Fef;*/
+        }
+        #text_02 {
+            /*position: relative;*/
+        }
+        #centence_02 {
+            position: fixed;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            text-align: center;
+            width: 100%;
+            /*background-color: #011Fef;*/
+        }
+    </style>
+</head>
+<body>
+    <div id="text">
+        <p id="centence">
+            「肉」は世界へ茫洋と延び広がる得体の知れない身体のようなもの。<br>
+            そのなかにいろんな分割が起こり分節化され、<br>
+            それがひとしきり構造化されて、<br>
+            結果的にこの人間ができたり社会ができたりしていく。<br>
+            <br>
+            こうした「肉」は、当初、自己意識をもっていません。<br>
+            ところが、何かのひょうしに「肉」が「肉」に触る。<br>
+            1枚の布や紙のような物がムニュっと曲がって触ると、<br>
+            本来同一のものでありながら、お互いの間に差異が生じ、<br>
+            お互いが別のものとして立ち現れてきます。<br>
+            それまでは何の意識もない布切れみたいなものがです。<br>
+            （加賀野井秀一）
+        </p>
+    </div>
+    <div id="text_02">
+        <p id="centence_02">
+            謎は、私の身体が<見るもの>であると同時に<見えるもの>だという点にある。<br>
+            <br>
+            私の身体は自分で見たり動いたりもするのだから、自分のまわりに物を集めるのだが、<br>
+            それらの物はいわば身体そのものの付属品か延長であって、その肉のうちに象嵌され、<br>
+            言葉の全き意味での身体の一部をなしている。<br>
+            したがって、世界は、ほかならぬ身体という生地で仕立てられていることになるのだ。<br>
+            <br>
+            身体があると言えるのは、<br>
+            <見るもの>と<見られるもの>・<触るもの>と<触られるもの><br>
+            一方の眼と他方の眼・一方の手と他方の手のあいだに或る種の交差が起こり、<br>
+            <感じ-感じられる>という火花が飛び散って、そこに火がともり、<br>
+            そしてその火が絶え間なく燃え続ける時なのである。<br>
+            （M.メルロ=ポンティ）
+        </p>
+    </div>
+    <canvas id="canvas"></canvas>
+    <div class="controls">
+        <div class="control-group">
+            <label>numPoints: <span id="numPointsValue">190</span></label>
+            <input type="range" id="numPoints" min="10" max="1000" step="10" value="190">
+        </div>
+        <div class="control-group">
+            <label>stiffness: <span id="stiffnessValue">0.1</span></label>
+            <input type="range" id="stiffness" min="0.001" max="0.5" step="0.001" value="0.1">
+        </div>
+        <div class="control-group">
+            <label>avoidanceStrength: <span id="avoidanceStrengthValue">150</span></label>
+            <input type="range" id="avoidanceStrength" min="50" max="500" step="10" value="150">
+        </div>
+        <div class="control-group">
+            <label>returnStrength: <span id="returnStrengthValue">0.01</span></label>
+            <input type="range" id="returnStrength" min="0.00001" max="0.01" step="0.00001" value="0.01">
+        </div>
+        <div class="control-group">
+            <label>collisionThreshold: <span id="collisionThresholdValue">10</span></label>
+            <input type="range" id="collisionThreshold" min="0.00001" max="10" step="0.00001" value="10">
+        </div>
+    </div>
+    <script>
+        const canvas = document.getElementById("canvas");
+        const ctx = canvas.getContext("2d");
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        let points = [];
+        let numPoints = 190;
+        let stiffness = 0.1;
+        let avoidanceStrength = 150;
+        let returnStrength = 0.01;
+        let collisionThreshold = 10;
+        let collisionPoints = [];
+
+        function initPoints() {
+            points = [];
+            for (let i = 0; i < numPoints; i++) {
+                let baseX = (canvas.width / (numPoints - 1)) * i;
+                let baseY = canvas.height / 2;
+                points.push({
+                    x: baseX,
+                    y: baseY,
+                    baseX: baseX,
+                    baseY: baseY,
+                    vx: 0,
+                    vy: 0
+                });
+            }
+        }
+        initPoints();
+
+        let mouse = { x: -1000, y: -1000 };
+        window.addEventListener("mousemove", (e) => {
+            mouse.x = e.clientX;
+            mouse.y = e.clientY;
+        });
+
+        function update() {
+            collisionPoints = [];
+            for (let i = 0; i < points.length; i++) {
+                let p = points[i];
+
+                let dx = p.x - mouse.x;
+                let dy = p.y - mouse.y;
+                let dist = Math.sqrt(dx * dx + dy * dy);
+
+                if (dist < avoidanceStrength) {
+                    let angle = Math.atan2(dy, dx);
+                    let force = (avoidanceStrength - dist) / avoidanceStrength;
+                    p.vx += Math.cos(angle) * force * 8;
+                    p.vy += Math.sin(angle) * force * 8;
+                }
+
+                p.vx += (p.baseX - p.x) * returnStrength;
+                p.vy += (p.baseY - p.y) * returnStrength;
+
+                for (let j = i + 1; j < points.length; j++) {
+                    let p2 = points[j];
+                    let dx2 = p.x - p2.x;
+                    let dy2 = p.y - p2.y;
+                    let dist2 = Math.sqrt(dx2 * dx2 + dy2 * dy2);
+
+                    if (dist2 < collisionThreshold) {
+                        let angle2 = Math.atan2(dy2, dx2);
+                        p.vx += Math.cos(angle2) * 5;
+                        p.vy += Math.sin(angle2) * 5;
+                        p2.vx -= Math.cos(angle2) * 5;
+                        p2.vy -= Math.sin(angle2) * 5;
+
+                        collisionPoints.push({ x: (p.x + p2.x) / 2, y: (p.y + p2.y) / 2 });
+                    }
+                }
+
+                p.vx *= 0.9;
+                p.vy *= 0.9;
+
+                p.x += p.vx;
+                p.y += p.vy;
+            }
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            ctx.beginPath();
+            ctx.moveTo(points[0].x, points[0].y);
+            for (let i = 1; i < points.length - 1; i++) {
+                let xc = (points[i].x + points[i + 1].x) / 2;
+                let yc = (points[i].y + points[i + 1].y) / 2;
+                ctx.quadraticCurveTo(points[i].x, points[i].y, xc, yc);
+            }
+            ctx.strokeStyle = "black";
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            ctx.fillStyle = "red";
+            for (let cp of collisionPoints) {
+                ctx.beginPath();
+                ctx.arc(cp.x, cp.y, 5, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        function animate() {
+            update();
+            draw();
+            requestAnimationFrame(animate);
+        }
+
+        animate();
+
+        document.querySelectorAll("input[type=range]").forEach(input => {
+            input.addEventListener("input", () => {
+                let id = input.id;
+                let value = parseFloat(input.value);
+                document.getElementById(id + "Value").innerText = value;
+
+                switch (id) {
+                    case "numPoints":
+                        numPoints = value;
+                        initPoints();
+                        break;
+                    case "stiffness":
+                        stiffness = value;
+                        break;
+                    case "avoidanceStrength":
+                        avoidanceStrength = value;
+                        break;
+                    case "returnStrength":
+                        returnStrength = value;
+                        break;
+                    case "collisionThreshold":
+                        collisionThreshold = value;
+                        break;
+                }
+            });
+        });
+    </script>
+</body>
+</html>
